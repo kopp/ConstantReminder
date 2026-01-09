@@ -202,6 +202,7 @@ class ReminderReceiver : BroadcastReceiver() {
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(reminder.name)
             .setContentText(reminder.text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(reminder.text))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .addAction(0, "öfter erinnern", increasePendingIntent)
