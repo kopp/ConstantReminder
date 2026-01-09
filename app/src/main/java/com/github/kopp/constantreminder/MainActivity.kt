@@ -31,8 +31,11 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
 import android.Manifest
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToLong
 
 class MainActivity : AppCompatActivity() {
 
@@ -241,7 +244,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     class ReminderAdapter(private val reminders: List<Reminder>) : RecyclerView.Adapter<ReminderAdapter.ViewHolder>() {
-        private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val nameText: TextView = view.findViewById(R.id.textViewName)
@@ -260,21 +262,50 @@ class MainActivity : AppCompatActivity() {
             holder.nameText.text = reminder.name
             holder.contentText.text = reminder.text
             
-            val days = reminder.intervalMs / (24 * 60 * 60 * 1000)
-            val hours = (reminder.intervalMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000)
-            val minutes = (reminder.intervalMs % (60 * 60 * 1000)) / (60 * 1000)
+            val intervalMs = reminder.intervalMs
+            val totalHours = intervalMs / (1000.0 * 60 * 60)
             
-            val intervalText = buildString {
-                append("Interval: ")
-                if (days > 0) append("${days}d ")
-                if (hours > 0) append("${hours}h ")
-                if (minutes > 0 || (days == 0L && hours == 0L)) append("${minutes}m")
-            }.trim()
-            
+            val intervalText = if (intervalMs < 24 * 60 * 60 * 1000L) {
+                val h = intervalMs / (1000 * 60 * 60)
+                val m = (intervalMs % (1000 * 60 * 60)) / (1000 * 60)
+                "Interval: %02d:%02d".format(h, m)
+            } else {
+                val d = (totalHours / 24.0).roundToLong()
+                val diffHours = abs(totalHours - (d * 24.0))
+                val prefix = if (diffHours > 6.0) "~" else ""
+                "Interval: $prefix$d days"
+            }
             holder.frequencyText.text = intervalText
             
-            val lastTime = if (reminder.lastShownMs > 0) timeFormat.format(Date(reminder.lastShownMs)) else "--:--"
-            holder.statsText.text = "Last: $lastTime | %d times".format(reminder.totalShownCount)
+            val lastTimeFormatted = if (reminder.lastShownMs > 0) {
+                formatLastShown(reminder.lastShownMs)
+            } else {
+                "--:--"
+            }
+            holder.statsText.text = "Last: $lastTimeFormatted | %d times".format(reminder.totalShownCount)
+        }
+
+        private fun formatLastShown(timeMs: Long): String {
+            val lastShown = Date(timeMs)
+            val now = Calendar.getInstance()
+            val last = Calendar.getInstance().apply { time = lastShown }
+
+            val isSameDay = now.get(Calendar.YEAR) == last.get(Calendar.YEAR) &&
+                            now.get(Calendar.DAY_OF_YEAR) == last.get(Calendar.DAY_OF_YEAR)
+
+            val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+            val isYesterday = yesterday.get(Calendar.YEAR) == last.get(Calendar.YEAR) &&
+                              yesterday.get(Calendar.DAY_OF_YEAR) == last.get(Calendar.DAY_OF_YEAR)
+
+            val diffMs = now.timeInMillis - timeMs
+            val diffDays = diffMs / (1000 * 60 * 60 * 24)
+
+            return when {
+                isSameDay -> SimpleDateFormat("HH:mm", Locale.getDefault()).format(lastShown)
+                isYesterday -> "yesterday " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(lastShown)
+                diffDays < 6 -> SimpleDateFormat("EEEE HH:mm", Locale.getDefault()).format(lastShown)
+                else -> SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(lastShown)
+            }
         }
 
         override fun getItemCount() = reminders.size
