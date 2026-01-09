@@ -13,8 +13,11 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
@@ -30,6 +33,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
 import android.Manifest
+import org.json.JSONArray
+import org.json.JSONException
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -63,6 +68,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+        
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayShowTitleEnabled(false)
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
@@ -86,6 +96,82 @@ class MainActivity : AppCompatActivity() {
         }
 
         checkPermissions()
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_share -> {
+                shareConfiguration()
+                true
+            }
+            R.id.action_import -> {
+                showImportDialog()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun showImportDialog() {
+        val input = EditText(this)
+        input.hint = "Paste JSON here"
+        
+        AlertDialog.Builder(this)
+            .setTitle("Import Reminders")
+            .setView(input)
+            .setPositiveButton("Import") { _, _ ->
+                val jsonString = input.text.toString()
+                importJson(jsonString)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun importJson(jsonString: String) {
+        try {
+            val jsonArray = JSONArray(jsonString)
+            val currentReminders = ReminderReceiver.getReminders(this)
+            val knownIds = currentReminders.map { it.id }.toSet()
+            var importedCount = 0
+
+            for (i in 0 until jsonArray.length()) {
+                val reminderJson = jsonArray.getJSONObject(i)
+                val importedReminder = Reminder.fromJsonObject(reminderJson)
+                
+                if (importedReminder.id !in knownIds) {
+                    currentReminders.add(importedReminder)
+                    startReminder(importedReminder)
+                    importedCount++
+                }
+            }
+
+            if (importedCount > 0) {
+                ReminderReceiver.saveReminders(this, currentReminders)
+                Toast.makeText(this, "Imported $importedCount new reminders", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "No new reminders imported from input", Toast.LENGTH_SHORT).show()
+            }
+
+        } catch (e: JSONException) {
+            Toast.makeText(this, "Invalid JSON format", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun shareConfiguration() {
+        val jsonString = prefs.getString(ReminderReceiver.KEY_REMINDERS, "[]")
+        val sendIntent: Intent = Intent().apply {
+            action = Intent.ACTION_SEND
+            putExtra(Intent.EXTRA_TEXT, jsonString)
+            type = "text/plain"
+        }
+
+        val shareIntent = Intent.createChooser(sendIntent, "Share Reminders Configuration")
+        startActivity(shareIntent)
     }
 
     private fun setupSwipeToDelete(recyclerView: RecyclerView) {
