@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -30,6 +31,15 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var adapter: ReminderAdapter
     private val reminders = mutableListOf<Reminder>()
+    private lateinit var prefs: SharedPreferences
+
+    private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
+        if (key == ReminderReceiver.KEY_REMINDERS) {
+            runOnUiThread {
+                refreshReminders()
+            }
+        }
+    }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -49,6 +59,9 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
+        prefs = getSharedPreferences(ReminderReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.registerOnSharedPreferenceChangeListener(preferenceChangeListener)
+
         reminders.addAll(ReminderReceiver.getReminders(this))
         
         val recyclerView = findViewById<RecyclerView>(R.id.recyclerViewReminders)
@@ -61,6 +74,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         checkPermissions()
+    }
+
+    private fun refreshReminders() {
+        reminders.clear()
+        reminders.addAll(ReminderReceiver.getReminders(this))
+        adapter.notifyDataSetChanged()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        prefs.unregisterOnSharedPreferenceChangeListener(preferenceChangeListener)
     }
 
     private fun checkPermissions() {
@@ -95,9 +119,10 @@ class MainActivity : AppCompatActivity() {
     private fun addReminder(name: String, text: String, intervalMs: Long) {
         val id = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
         val newReminder = Reminder(id, name, text, intervalMs)
-        reminders.add(newReminder)
-        ReminderReceiver.saveReminders(this, reminders)
-        adapter.notifyItemInserted(reminders.size - 1)
+        val currentReminders = ReminderReceiver.getReminders(this)
+        currentReminders.add(newReminder)
+        ReminderReceiver.saveReminders(this, currentReminders)
+        // refreshReminders() will be called automatically by the preference listener
         
         startReminder(newReminder)
     }
