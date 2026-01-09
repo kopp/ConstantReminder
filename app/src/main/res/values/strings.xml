@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">ConstantReminder</string>
+    <string name="add_button">Add new element</string>
 </resources>

@@ -14,79 +14,138 @@ import androidx.core.app.NotificationManagerCompat
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import org.json.JSONArray
+import org.json.JSONObject
+
+data class Reminder(
+    val id: Int,
+    val name: String,
+    val text: String,
+    var intervalMs: Long
+) {
+    fun toJsonObject(): JSONObject {
+        return JSONObject().apply {
+            put("id", id)
+            put("name", name)
+            put("text", text)
+            put("intervalMs", intervalMs)
+        }
+    }
+
+    companion object {
+        fun fromJsonObject(json: JSONObject): Reminder {
+            return Reminder(
+                json.getInt("id"),
+                json.getString("name"),
+                json.getString("text"),
+                json.getLong("intervalMs")
+            )
+        }
+    }
+}
 
 class ReminderReceiver : BroadcastReceiver() {
 
     companion object {
+        const val ACTION_REMIND = "com.github.kopp.constantreminder.REMIND"
         const val ACTION_INCREASE_FREQUENCY = "com.github.kopp.constantreminder.INCREASE_FREQUENCY"
         const val ACTION_DECREASE_FREQUENCY = "com.github.kopp.constantreminder.DECREASE_FREQUENCY"
         const val ACTION_DISMISS = "com.github.kopp.constantreminder.DISMISS"
         
+        const val EXTRA_REMINDER_ID = "reminder_id"
+        
         const val PREFS_NAME = "ReminderPrefs"
-        const val KEY_INTERVAL = "interval_ms"
-        const val DEFAULT_INTERVAL = 5 * 60 * 1000L
+        const val KEY_REMINDERS = "reminders_list"
+
+        fun getReminders(context: Context): MutableList<Reminder> {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val jsonString = prefs.getString(KEY_REMINDERS, null) ?: return mutableListOf()
+            val jsonArray = JSONArray(jsonString)
+            val list = mutableListOf<Reminder>()
+            for (i in 0 until jsonArray.length()) {
+                list.add(Reminder.fromJsonObject(jsonArray.getJSONObject(i)))
+            }
+            return list
+        }
+
+        fun saveReminders(context: Context, reminders: List<Reminder>) {
+            val jsonArray = JSONArray()
+            reminders.forEach { jsonArray.put(it.toJsonObject()) }
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putString(KEY_REMINDERS, jsonArray.toString()).apply()
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
+        val reminderId = intent.getIntExtra(EXTRA_REMINDER_ID, -1)
+        if (reminderId == -1) return
+
+        val reminders = getReminders(context)
+        val reminder = reminders.find { it.id == reminderId } ?: return
+
         when (intent.action) {
             ACTION_INCREASE_FREQUENCY -> {
-                updateInterval(context, 1.3) // Increase frequency
-                dismissNotification(context)
+                updateReminderInterval(context, reminder, 1.3)
+                dismissNotification(context, reminderId)
             }
             ACTION_DECREASE_FREQUENCY -> {
-                updateInterval(context, 0.7) // Decrease frequency
-                dismissNotification(context)
+                updateReminderInterval(context, reminder, 0.7)
+                dismissNotification(context, reminderId)
             }
             ACTION_DISMISS -> {
-                dismissNotification(context)
+                dismissNotification(context, reminderId)
             }
             else -> {
                 createNotificationChannel(context)
-                showNotification(context)
+                showNotification(context, reminder)
             }
         }
     }
 
-    private fun updateInterval(context: Context, factor: Double) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val currentInterval = prefs.getLong(KEY_INTERVAL, DEFAULT_INTERVAL)
-        // frequency = 1/interval. New freq = old freq * factor => New interval = old interval / factor
-        val newInterval = (currentInterval / factor).toLong().coerceAtLeast(60000L) // Min 1 minute
-        
-        prefs.edit().putLong(KEY_INTERVAL, newInterval).apply()
-        
-        rescheduleAlarm(context, newInterval)
-        
-        val minutes = newInterval / 60000.0
-        Toast.makeText(context, "Neues Intervall: %.1f Minuten".format(minutes), Toast.LENGTH_SHORT).show()
+    private fun updateReminderInterval(context: Context, reminder: Reminder, factor: Double) {
+        val reminders = getReminders(context)
+        val index = reminders.indexOfFirst { it.id == reminder.id }
+        if (index != -1) {
+            val newInterval = (reminders[index].intervalMs / factor).toLong().coerceAtLeast(60000L)
+            reminders[index].intervalMs = newInterval
+            saveReminders(context, reminders)
+            
+            rescheduleAlarm(context, reminders[index])
+            
+            val minutes = newInterval / 60000.0
+            Toast.makeText(context, "${reminder.name}: %.1f Minuten".format(minutes), Toast.LENGTH_SHORT).show()
+        }
     }
 
-    private fun rescheduleAlarm(context: Context, intervalMs: Long) {
+    private fun rescheduleAlarm(context: Context, reminder: Reminder) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, ReminderReceiver::class.java)
+        val intent = Intent(context, ReminderReceiver::class.java).apply {
+            action = ACTION_REMIND
+            putExtra(EXTRA_REMINDER_ID, reminder.id)
+        }
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            0,
+            reminder.id,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         alarmManager.setRepeating(
             AlarmManager.RTC_WAKEUP,
-            System.currentTimeMillis() + intervalMs,
-            intervalMs,
+            System.currentTimeMillis() + reminder.intervalMs,
+            reminder.intervalMs,
             pendingIntent
         )
     }
 
-    private fun dismissNotification(context: Context) {
-        NotificationManagerCompat.from(context).cancel(1)
+    private fun dismissNotification(context: Context, id: Int) {
+        NotificationManagerCompat.from(context).cancel(id)
     }
 
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Reminder Channel"
-            val descriptionText = "Channel for gratitude reminders"
+            val descriptionText = "Channel for all reminders"
             val importance = NotificationManager.IMPORTANCE_DEFAULT
             val channel = NotificationChannel("gratitude_channel", name, importance).apply {
                 description = descriptionText
@@ -97,26 +156,35 @@ class ReminderReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun showNotification(context: Context) {
+    private fun showNotification(context: Context, reminder: Reminder) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 return
             }
         }
 
-        val increaseIntent = Intent(context, ReminderReceiver::class.java).apply { action = ACTION_INCREASE_FREQUENCY }
-        val increasePendingIntent = PendingIntent.getBroadcast(context, 1, increaseIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val increaseIntent = Intent(context, ReminderReceiver::class.java).apply { 
+            action = ACTION_INCREASE_FREQUENCY 
+            putExtra(EXTRA_REMINDER_ID, reminder.id)
+        }
+        val increasePendingIntent = PendingIntent.getBroadcast(context, reminder.id * 10 + 1, increaseIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
-        val okIntent = Intent(context, ReminderReceiver::class.java).apply { action = ACTION_DISMISS }
-        val okPendingIntent = PendingIntent.getBroadcast(context, 2, okIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val okIntent = Intent(context, ReminderReceiver::class.java).apply { 
+            action = ACTION_DISMISS 
+            putExtra(EXTRA_REMINDER_ID, reminder.id)
+        }
+        val okPendingIntent = PendingIntent.getBroadcast(context, reminder.id * 10 + 2, okIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
-        val decreaseIntent = Intent(context, ReminderReceiver::class.java).apply { action = ACTION_DECREASE_FREQUENCY }
-        val decreasePendingIntent = PendingIntent.getBroadcast(context, 3, decreaseIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val decreaseIntent = Intent(context, ReminderReceiver::class.java).apply { 
+            action = ACTION_DECREASE_FREQUENCY 
+            putExtra(EXTRA_REMINDER_ID, reminder.id)
+        }
+        val decreasePendingIntent = PendingIntent.getBroadcast(context, reminder.id * 10 + 3, decreaseIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val builder = NotificationCompat.Builder(context, "gratitude_channel")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Dankbarkeit")
-            .setContentText("Zeit für einen Moment der Dankbarkeit.")
+            .setContentTitle(reminder.name)
+            .setContentText(reminder.text)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .addAction(0, "öfter erinnern", increasePendingIntent)
@@ -124,7 +192,7 @@ class ReminderReceiver : BroadcastReceiver() {
             .addAction(0, "weniger erinnern", decreasePendingIntent)
 
         with(NotificationManagerCompat.from(context)) {
-            notify(1, builder.build())
+            notify(reminder.id, builder.build())
         }
     }
 }
