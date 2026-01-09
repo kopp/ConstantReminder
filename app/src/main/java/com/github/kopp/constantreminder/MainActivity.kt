@@ -61,6 +61,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startReminder() {
+        val prefs = getSharedPreferences(ReminderReceiver.PREFS_NAME, Context.MODE_PRIVATE)
+        val interval = prefs.getLong(ReminderReceiver.KEY_INTERVAL, ReminderReceiver.DEFAULT_INTERVAL)
+        
         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(this, ReminderReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
@@ -69,9 +72,6 @@ class MainActivity : AppCompatActivity() {
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-
-        val interval = 10 * 1000L // 10 seconds
-        val triggerTime = System.currentTimeMillis() + interval
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (!alarmManager.canScheduleExactAlarms()) {
@@ -83,11 +83,12 @@ class MainActivity : AppCompatActivity() {
 
         alarmManager.setRepeating(
             AlarmManager.RTC_WAKEUP,
-            triggerTime,
+            System.currentTimeMillis() + interval,
             interval,
             pendingIntent
         )
         
-        Toast.makeText(this, "Notifications Scheduled :)", Toast.LENGTH_SHORT).show()
+        val minutes = interval / 60000.0
+        Toast.makeText(this, "Erinnerung eingestellt (alle %.1f Min)".format(minutes), Toast.LENGTH_SHORT).show()
     }
 }
