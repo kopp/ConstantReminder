@@ -5,9 +5,7 @@ plugins {
 
 android {
     namespace = "com.github.kopp.constantreminder"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
     buildToolsVersion = "36.1.0"
 
     defaultConfig {
