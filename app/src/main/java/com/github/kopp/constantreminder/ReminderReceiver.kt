@@ -21,7 +21,9 @@ data class Reminder(
     val id: Int,
     val name: String,
     val text: String,
-    var intervalMs: Long
+    var intervalMs: Long,
+    var lastShownMs: Long = 0,
+    var totalShownCount: Int = 0
 ) {
     fun toJsonObject(): JSONObject {
         return JSONObject().apply {
@@ -29,6 +31,8 @@ data class Reminder(
             put("name", name)
             put("text", text)
             put("intervalMs", intervalMs)
+            put("lastShownMs", lastShownMs)
+            put("totalShownCount", totalShownCount)
         }
     }
 
@@ -38,7 +42,9 @@ data class Reminder(
                 json.getInt("id"),
                 json.getString("name"),
                 json.getString("text"),
-                json.getLong("intervalMs")
+                json.getLong("intervalMs"),
+                json.optLong("lastShownMs", 0),
+                json.optInt("totalShownCount", 0)
             )
         }
     }
@@ -96,9 +102,20 @@ class ReminderReceiver : BroadcastReceiver() {
                 dismissNotification(context, reminderId)
             }
             else -> {
+                updateShownStats(context, reminderId)
                 createNotificationChannel(context)
                 showNotification(context, reminder)
             }
+        }
+    }
+
+    private fun updateShownStats(context: Context, id: Int) {
+        val reminders = getReminders(context)
+        val index = reminders.indexOfFirst { it.id == id }
+        if (index != -1) {
+            reminders[index].lastShownMs = System.currentTimeMillis()
+            reminders[index].totalShownCount++
+            saveReminders(context, reminders)
         }
     }
 

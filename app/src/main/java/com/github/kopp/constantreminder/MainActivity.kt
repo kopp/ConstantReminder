@@ -30,6 +30,9 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.textfield.TextInputEditText
 import android.Manifest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -226,10 +229,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     class ReminderAdapter(private val reminders: List<Reminder>) : RecyclerView.Adapter<ReminderAdapter.ViewHolder>() {
+        private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val nameText: TextView = view.findViewById(R.id.textViewName)
             val contentText: TextView = view.findViewById(R.id.textViewText)
             val frequencyText: TextView = view.findViewById(R.id.textViewFrequency)
+            val statsText: TextView = view.findViewById(R.id.textViewStats)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -242,6 +248,9 @@ class MainActivity : AppCompatActivity() {
             holder.nameText.text = reminder.name
             holder.contentText.text = reminder.text
             holder.frequencyText.text = "Interval: %.1f Min".format(reminder.intervalMs / 60000.0)
+            
+            val lastTime = if (reminder.lastShownMs > 0) timeFormat.format(Date(reminder.lastShownMs)) else "--:--"
+            holder.statsText.text = "Last: $lastTime | %d times".format(reminder.totalShownCount)
         }
 
         override fun getItemCount() = reminders.size
