@@ -262,6 +262,16 @@ class MainActivity : AppCompatActivity() {
             holder.nameText.text = reminder.name
             holder.contentText.text = reminder.text
             
+            holder.contentText.setOnLongClickListener {
+                val context = holder.itemView.context
+                val intent = Intent(context, ReminderReceiver::class.java).apply {
+                    action = ReminderReceiver.ACTION_REMIND
+                    putExtra(ReminderReceiver.EXTRA_REMINDER_ID, reminder.id)
+                }
+                context.sendBroadcast(intent)
+                true
+            }
+
             val intervalMs = reminder.intervalMs
             val totalHours = intervalMs / (1000.0 * 60 * 60)
             
