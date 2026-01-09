@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -21,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -69,6 +73,8 @@ class MainActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this)
 
+        setupSwipeToDelete(recyclerView)
+
         findViewById<FloatingActionButton>(R.id.floatingActionButton).setOnClickListener {
             showAddReminderDialog()
         }
@@ -76,10 +82,74 @@ class MainActivity : AppCompatActivity() {
         checkPermissions()
     }
 
+    private fun setupSwipeToDelete(recyclerView: RecyclerView) {
+        val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
+            private val background = ColorDrawable(Color.RED)
+            private val deleteIcon = ContextCompat.getDrawable(this@MainActivity, android.R.drawable.ic_menu_delete)
+
+            override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, t: RecyclerView.ViewHolder): Boolean = false
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val position = viewHolder.adapterPosition
+                val reminderToDelete = reminders[position]
+                
+                // Cancel Alarm
+                cancelReminder(reminderToDelete)
+                
+                // Remove from List and Storage
+                reminders.removeAt(position)
+                ReminderReceiver.saveReminders(this@MainActivity, reminders)
+                adapter.notifyItemRemoved(position)
+                
+                Toast.makeText(this@MainActivity, "${reminderToDelete.name} deleted", Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onChildDraw(c: Canvas, rv: RecyclerView, vh: RecyclerView.ViewHolder, dX: Float, dY: Float, sState: Int, isActive: Boolean) {
+                val itemView = vh.itemView
+                val iconMargin = (itemView.height - (deleteIcon?.intrinsicHeight ?: 0)) / 2
+
+                if (dX < 0) { // Swiping to the left
+                    background.setBounds(itemView.right + dX.toInt(), itemView.top, itemView.right, itemView.bottom)
+                    background.draw(c)
+
+                    deleteIcon?.let {
+                        val iconLeft = itemView.right - iconMargin - it.intrinsicWidth
+                        val iconRight = itemView.right - iconMargin
+                        val iconTop = itemView.top + iconMargin
+                        val iconBottom = itemView.bottom - iconMargin
+                        it.setBounds(iconLeft, iconTop, iconRight, iconBottom)
+                        it.draw(c)
+                    }
+                }
+                super.onChildDraw(c, rv, vh, dX, dY, sState, isActive)
+            }
+        }
+        ItemTouchHelper(swipeHandler).attachToRecyclerView(recyclerView)
+    }
+
+    private fun cancelReminder(reminder: Reminder) {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(this, ReminderReceiver::class.java).apply {
+            action = ReminderReceiver.ACTION_REMIND
+            putExtra(ReminderReceiver.EXTRA_REMINDER_ID, reminder.id)
+        }
+        val pendingIntent = PendingIntent.getBroadcast(
+            this,
+            reminder.id,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        alarmManager.cancel(pendingIntent)
+    }
+
     private fun refreshReminders() {
-        reminders.clear()
-        reminders.addAll(ReminderReceiver.getReminders(this))
-        adapter.notifyDataSetChanged()
+        val newReminders = ReminderReceiver.getReminders(this)
+        // Only update if something actually changed to avoid disrupting user interaction
+        if (newReminders != reminders) {
+            reminders.clear()
+            reminders.addAll(newReminders)
+            adapter.notifyDataSetChanged()
+        }
     }
 
     override fun onDestroy() {
@@ -122,7 +192,6 @@ class MainActivity : AppCompatActivity() {
         val currentReminders = ReminderReceiver.getReminders(this)
         currentReminders.add(newReminder)
         ReminderReceiver.saveReminders(this, currentReminders)
-        // refreshReminders() will be called automatically by the preference listener
         
         startReminder(newReminder)
     }
