@@ -3,4 +3,9 @@
     <string name="add_button">Add new element</string>
     <string name="app_logo_description">Constant Reminder Logo</string>
     <string name="add_reminder_description">Add new reminder</string>
+    <string-array name="time_units">
+        <item>Minutes</item>
+        <item>Hours</item>
+        <item>Days</item>
+    </string-array>
 </resources>

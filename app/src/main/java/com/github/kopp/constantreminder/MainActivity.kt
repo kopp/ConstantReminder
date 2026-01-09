@@ -172,7 +172,9 @@ class MainActivity : AppCompatActivity() {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_add_reminder, null)
         val nameInput = view.findViewById<TextInputEditText>(R.id.editTextName)
         val textInput = view.findViewById<TextInputEditText>(R.id.editTextText)
-        val intervalInput = view.findViewById<TextInputEditText>(R.id.editTextInterval)
+        val daysInput = view.findViewById<TextInputEditText>(R.id.editTextDays)
+        val hoursInput = view.findViewById<TextInputEditText>(R.id.editTextHours)
+        val minutesInput = view.findViewById<TextInputEditText>(R.id.editTextMinutes)
 
         AlertDialog.Builder(this)
             .setTitle("Add Reminder")
@@ -180,9 +182,19 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Add") { _, _ ->
                 val name = nameInput.text.toString()
                 val text = textInput.text.toString()
-                val intervalMin = intervalInput.text.toString().toDoubleOrNull() ?: 5.0
-                if (name.isNotEmpty() && text.isNotEmpty()) {
-                    addReminder(name, text, (intervalMin * 60000).toLong())
+                
+                val days = daysInput.text.toString().toLongOrNull() ?: 0L
+                val hours = hoursInput.text.toString().toLongOrNull() ?: 0L
+                val minutes = minutesInput.text.toString().toLongOrNull() ?: 0L
+                
+                val intervalMs = (days * 24 * 60 * 60 * 1000L) + 
+                                 (hours * 60 * 60 * 1000L) + 
+                                 (minutes * 60 * 1000L)
+
+                if (name.isNotEmpty() && text.isNotEmpty() && intervalMs > 0) {
+                    addReminder(name, text, intervalMs)
+                } else if (intervalMs <= 0) {
+                    Toast.makeText(this, "Interval must be greater than 0", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -247,7 +259,19 @@ class MainActivity : AppCompatActivity() {
             val reminder = reminders[position]
             holder.nameText.text = reminder.name
             holder.contentText.text = reminder.text
-            holder.frequencyText.text = "Interval: %.1f Min".format(reminder.intervalMs / 60000.0)
+            
+            val days = reminder.intervalMs / (24 * 60 * 60 * 1000)
+            val hours = (reminder.intervalMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000)
+            val minutes = (reminder.intervalMs % (60 * 60 * 1000)) / (60 * 1000)
+            
+            val intervalText = buildString {
+                append("Interval: ")
+                if (days > 0) append("${days}d ")
+                if (hours > 0) append("${hours}h ")
+                if (minutes > 0 || (days == 0L && hours == 0L)) append("${minutes}m")
+            }.trim()
+            
+            holder.frequencyText.text = intervalText
             
             val lastTime = if (reminder.lastShownMs > 0) timeFormat.format(Date(reminder.lastShownMs)) else "--:--"
             holder.statsText.text = "Last: $lastTime | %d times".format(reminder.totalShownCount)
