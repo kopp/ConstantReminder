@@ -37,6 +37,7 @@ import org.json.JSONArray
 import org.json.JSONException
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Collections
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
@@ -91,7 +92,7 @@ class MainActivity : AppCompatActivity() {
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        setupSwipeToDelete(recyclerView)
+        setupTouchHelper(recyclerView)
 
         findViewById<FloatingActionButton>(R.id.floatingActionButton).setOnClickListener {
             showAddReminderDialog()
@@ -176,12 +177,19 @@ class MainActivity : AppCompatActivity() {
         startActivity(shareIntent)
     }
 
-    private fun setupSwipeToDelete(recyclerView: RecyclerView) {
-        val swipeHandler = object : ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT) {
+    private fun setupTouchHelper(recyclerView: RecyclerView) {
+        val touchHandler = object : ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP or ItemTouchHelper.DOWN, ItemTouchHelper.LEFT) {
             private val background = ColorDrawable(Color.RED)
             private val deleteIcon = ContextCompat.getDrawable(this@MainActivity, android.R.drawable.ic_menu_delete)
 
-            override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, t: RecyclerView.ViewHolder): Boolean = false
+            override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
+                val fromPos = vh.adapterPosition
+                val toPos = target.adapterPosition
+                
+                Collections.swap(reminders, fromPos, toPos)
+                adapter.notifyItemMoved(fromPos, toPos)
+                return true
+            }
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.adapterPosition
@@ -196,6 +204,12 @@ class MainActivity : AppCompatActivity() {
                 adapter.notifyItemRemoved(position)
                 
                 Toast.makeText(this@MainActivity, getString(R.string.toast_reminder_deleted, reminderToDelete.name), Toast.LENGTH_SHORT).show()
+            }
+
+            override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+                super.clearView(recyclerView, viewHolder)
+                // Save the new order when dragging is finished
+                ReminderReceiver.saveReminders(this@MainActivity, reminders)
             }
 
             override fun onChildDraw(c: Canvas, rv: RecyclerView, vh: RecyclerView.ViewHolder, dX: Float, dY: Float, sState: Int, isActive: Boolean) {
@@ -218,7 +232,7 @@ class MainActivity : AppCompatActivity() {
                 super.onChildDraw(c, rv, vh, dX, dY, sState, isActive)
             }
         }
-        ItemTouchHelper(swipeHandler).attachToRecyclerView(recyclerView)
+        ItemTouchHelper(touchHandler).attachToRecyclerView(recyclerView)
     }
 
     private fun cancelReminder(reminder: Reminder) {
@@ -372,7 +386,7 @@ class MainActivity : AppCompatActivity() {
 
     class ReminderAdapter(
         private val reminders: List<Reminder>,
-        private val onLongClick: (Reminder) -> Unit
+        private val onClick: (Reminder) -> Unit
     ) : RecyclerView.Adapter<ReminderAdapter.ViewHolder>() {
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -392,9 +406,8 @@ class MainActivity : AppCompatActivity() {
             holder.nameText.text = reminder.name
             holder.contentText.text = reminder.text
             
-            holder.itemView.setOnLongClickListener {
-                onLongClick(reminder)
-                true
+            holder.itemView.setOnClickListener {
+                onClick(reminder)
             }
 
             val intervalMs = reminder.intervalMs
