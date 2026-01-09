@@ -8,6 +8,7 @@ android {
     compileSdk {
         version = release(36)
     }
+    buildToolsVersion = "36.1.0"
 
     defaultConfig {
         applicationId = "com.github.kopp.constantreminder"
