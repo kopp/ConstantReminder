@@ -88,6 +88,6 @@ class MainActivity : AppCompatActivity() {
             pendingIntent
         )
         
-        Toast.makeText(this, "Reminder set for every 5 minutes", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Notifications Scheduled :)", Toast.LENGTH_SHORT).show()
     }
 }
