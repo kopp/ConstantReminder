@@ -130,7 +130,7 @@ class ReminderReceiver : BroadcastReceiver() {
             rescheduleAlarm(context, reminders[index])
             
             val minutes = newInterval / 60000.0
-            Toast.makeText(context, "${reminder.name}: %.1f Minuten".format(minutes), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_new_interval, reminder.name, minutes), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -161,8 +161,8 @@ class ReminderReceiver : BroadcastReceiver() {
 
     private fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "Reminder Channel"
-            val descriptionText = "Channel for all reminders"
+            val name = context.getString(R.string.notification_channel_name)
+            val descriptionText = context.getString(R.string.notification_channel_description)
             val importance = NotificationManager.IMPORTANCE_DEFAULT
             val channel = NotificationChannel("gratitude_channel", name, importance).apply {
                 description = descriptionText
@@ -205,9 +205,9 @@ class ReminderReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(reminder.text))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
-            .addAction(0, "öfter erinnern", increasePendingIntent)
-            .addAction(0, "ok", okPendingIntent)
-            .addAction(0, "weniger erinnern", decreasePendingIntent)
+            .addAction(0, context.getString(R.string.action_increase), increasePendingIntent)
+            .addAction(0, context.getString(R.string.action_ok), okPendingIntent)
+            .addAction(0, context.getString(R.string.action_decrease), decreasePendingIntent)
 
         with(NotificationManagerCompat.from(context)) {
             notify(reminder.id, builder.build())

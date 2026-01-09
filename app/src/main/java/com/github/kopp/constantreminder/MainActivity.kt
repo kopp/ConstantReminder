@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
     private val reminders = mutableListOf<Reminder>()
     private lateinit var prefs: SharedPreferences
 
-    private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
+    private val preferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == ReminderReceiver.KEY_REMINDERS) {
             runOnUiThread {
                 refreshReminders()
@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (!isGranted) {
-            Toast.makeText(this, "Notification permission denied", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.toast_permission_denied, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -121,16 +121,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun showImportDialog() {
         val input = EditText(this)
-        input.hint = "Paste JSON here"
+        input.hint = getString(R.string.dialog_import_hint)
         
         AlertDialog.Builder(this)
-            .setTitle("Import Reminders")
+            .setTitle(R.string.dialog_import_title)
             .setView(input)
-            .setPositiveButton("Import") { _, _ ->
+            .setPositiveButton(R.string.dialog_import_button) { _, _ ->
                 val jsonString = input.text.toString()
                 importJson(jsonString)
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
             .show()
     }
 
@@ -154,13 +154,13 @@ class MainActivity : AppCompatActivity() {
 
             if (importedCount > 0) {
                 ReminderReceiver.saveReminders(this, currentReminders)
-                Toast.makeText(this, "Imported $importedCount new reminders", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.toast_imported_count, importedCount), Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(this, "No new reminders imported from input", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, R.string.toast_no_new_reminders, Toast.LENGTH_SHORT).show()
             }
 
         } catch (e: JSONException) {
-            Toast.makeText(this, "Invalid JSON format", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.toast_invalid_json, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -172,7 +172,7 @@ class MainActivity : AppCompatActivity() {
             type = "text/plain"
         }
 
-        val shareIntent = Intent.createChooser(sendIntent, "Share Reminders Configuration")
+        val shareIntent = Intent.createChooser(sendIntent, getString(R.string.share_title))
         startActivity(shareIntent)
     }
 
@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
                 ReminderReceiver.saveReminders(this@MainActivity, reminders)
                 adapter.notifyItemRemoved(position)
                 
-                Toast.makeText(this@MainActivity, "${reminderToDelete.name} deleted", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@MainActivity, getString(R.string.toast_reminder_deleted, reminderToDelete.name), Toast.LENGTH_SHORT).show()
             }
 
             override fun onChildDraw(c: Canvas, rv: RecyclerView, vh: RecyclerView.ViewHolder, dX: Float, dY: Float, sState: Int, isActive: Boolean) {
@@ -289,9 +289,9 @@ class MainActivity : AppCompatActivity() {
         }
 
         AlertDialog.Builder(this)
-            .setTitle(if (reminder == null) "Add Reminder" else "Edit Reminder")
+            .setTitle(if (reminder == null) R.string.dialog_add_title else R.string.dialog_edit_title)
             .setView(view)
-            .setPositiveButton(if (reminder == null) "Add" else "Save") { _, _ ->
+            .setPositiveButton(if (reminder == null) R.string.dialog_add else R.string.dialog_save) { _, _ ->
                 val name = nameInput.text.toString()
                 val text = textInput.text.toString()
                 
@@ -310,10 +310,10 @@ class MainActivity : AppCompatActivity() {
                         updateReminder(reminder, name, text, intervalMs)
                     }
                 } else if (intervalMs <= 0) {
-                    Toast.makeText(this, "Interval must be greater than 0", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.toast_interval_error, Toast.LENGTH_SHORT).show()
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.dialog_cancel, null)
             .show()
     }
 
@@ -403,24 +403,24 @@ class MainActivity : AppCompatActivity() {
             val intervalText = if (intervalMs < 24 * 60 * 60 * 1000L) {
                 val h = intervalMs / (1000 * 60 * 60)
                 val m = (intervalMs % (1000 * 60 * 60)) / (1000 * 60)
-                "Interval: %02d:%02d".format(h, m)
+                holder.itemView.context.getString(R.string.display_interval_hm, h, m)
             } else {
                 val d = (totalHours / 24.0).roundToLong()
                 val diffHours = abs(totalHours - (d * 24.0))
                 val prefix = if (diffHours > 6.0) "~" else ""
-                "Interval: $prefix$d days"
+                holder.itemView.context.getString(R.string.display_interval_days, prefix, d)
             }
             holder.frequencyText.text = intervalText
             
             val lastTimeFormatted = if (reminder.lastShownMs > 0) {
-                formatLastShown(reminder.lastShownMs)
+                formatLastShown(holder.itemView.context, reminder.lastShownMs)
             } else {
-                "--:--"
+                holder.itemView.context.getString(R.string.stats_never)
             }
-            holder.statsText.text = "Last: $lastTimeFormatted | %d times".format(reminder.totalShownCount)
+            holder.statsText.text = holder.itemView.context.getString(R.string.stats_last_shown, lastTimeFormatted, reminder.totalShownCount)
         }
 
-        private fun formatLastShown(timeMs: Long): String {
+        private fun formatLastShown(context: Context, timeMs: Long): String {
             val lastShown = Date(timeMs)
             val now = Calendar.getInstance()
             val last = Calendar.getInstance().apply { time = lastShown }
@@ -430,14 +430,14 @@ class MainActivity : AppCompatActivity() {
 
             val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
             val isYesterday = yesterday.get(Calendar.YEAR) == last.get(Calendar.YEAR) &&
-                              yesterday.get(Calendar.DAY_OF_YEAR) == last.get(Calendar.YEAR)
+                              yesterday.get(Calendar.DAY_OF_YEAR) == last.get(Calendar.DAY_OF_YEAR)
 
             val diffMs = now.timeInMillis - timeMs
             val diffDays = diffMs / (1000 * 60 * 60 * 24)
 
             return when {
                 isSameDay -> SimpleDateFormat("HH:mm", Locale.getDefault()).format(lastShown)
-                isYesterday -> "yesterday " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(lastShown)
+                isYesterday -> context.getString(R.string.date_yesterday, SimpleDateFormat("HH:mm", Locale.getDefault()).format(lastShown))
                 diffDays < 6 -> SimpleDateFormat("EEEE HH:mm", Locale.getDefault()).format(lastShown)
                 else -> SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(lastShown)
             }

@@ -1,11 +1,38 @@
 <resources>
-    <string name="app_name">ConstantReminder</string>
+    <string name="app_name">Constant Reminder</string>
     <string name="add_button">Add new element</string>
     <string name="app_logo_description">Constant Reminder Logo</string>
     <string name="add_reminder_description">Add new reminder</string>
-    <string-array name="time_units">
-        <item>Minutes</item>
-        <item>Hours</item>
-        <item>Days</item>
-    </string-array>
+    <string name="notification_channel_name">Reminder Channel</string>
+    <string name="notification_channel_description">Channel for all reminders</string>
+    <string name="action_increase">More often</string>
+    <string name="action_ok">OK</string>
+    <string name="action_decrease">Less often</string>
+    <string name="toast_new_interval">%1$s: %2$.1f Minutes</string>
+    <string name="toast_reminder_deleted">%1$s deleted</string>
+    <string name="dialog_import_title">Import Reminders</string>
+    <string name="dialog_import_hint">Paste JSON here</string>
+    <string name="dialog_import_button">Import</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="toast_imported_count">Imported %1$d new reminders</string>
+    <string name="toast_no_new_reminders">No new reminders imported from input</string>
+    <string name="toast_invalid_json">Invalid JSON format</string>
+    <string name="dialog_add_title">Add Reminder</string>
+    <string name="dialog_edit_title">Edit Reminder</string>
+    <string name="dialog_save">Save</string>
+    <string name="dialog_add">Add</string>
+    <string name="hint_name">Name</string>
+    <string name="hint_text">Reminder Text</string>
+    <string name="hint_days">Days</string>
+    <string name="hint_hours">Hours</string>
+    <string name="hint_minutes">Min</string>
+    <string name="label_interval">Interval</string>
+    <string name="toast_interval_error">Interval must be greater than 0</string>
+    <string name="display_interval_hm">Interval: %1$02d:%2$02d</string>
+    <string name="display_interval_days">Interval: %1$s%2$d days</string>
+    <string name="stats_last_shown">Last: %1$s | %2$d times</string>
+    <string name="stats_never">--:--</string>
+    <string name="date_yesterday">yesterday %1$s</string>
+    <string name="share_title">Share Reminders Configuration</string>
+    <string name="toast_permission_denied">Notification permission denied</string>
 </resources>
