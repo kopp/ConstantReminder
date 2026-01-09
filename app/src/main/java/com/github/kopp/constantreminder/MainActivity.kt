@@ -85,7 +85,9 @@ class MainActivity : AppCompatActivity() {
         reminders.addAll(ReminderReceiver.getReminders(this))
         
         val recyclerView = findViewById<RecyclerView>(R.id.recyclerViewReminders)
-        adapter = ReminderAdapter(reminders)
+        adapter = ReminderAdapter(reminders) { reminder ->
+            showEditReminderDialog(reminder)
+        }
         recyclerView.adapter = adapter
         recyclerView.layoutManager = LinearLayoutManager(this)
 
@@ -258,6 +260,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAddReminderDialog() {
+        showReminderDialog(null)
+    }
+
+    private fun showEditReminderDialog(reminder: Reminder) {
+        showReminderDialog(reminder)
+    }
+
+    private fun showReminderDialog(reminder: Reminder?) {
         val view = LayoutInflater.from(this).inflate(R.layout.dialog_add_reminder, null)
         val nameInput = view.findViewById<TextInputEditText>(R.id.editTextName)
         val textInput = view.findViewById<TextInputEditText>(R.id.editTextText)
@@ -265,10 +275,23 @@ class MainActivity : AppCompatActivity() {
         val hoursInput = view.findViewById<TextInputEditText>(R.id.editTextHours)
         val minutesInput = view.findViewById<TextInputEditText>(R.id.editTextMinutes)
 
+        if (reminder != null) {
+            nameInput.setText(reminder.name)
+            textInput.setText(reminder.text)
+            
+            val d = reminder.intervalMs / (24 * 60 * 60 * 1000L)
+            val h = (reminder.intervalMs % (24 * 60 * 60 * 1000L)) / (60 * 60 * 1000L)
+            val m = (reminder.intervalMs % (60 * 60 * 1000L)) / (60 * 1000L)
+            
+            daysInput.setText(d.toString())
+            hoursInput.setText(h.toString())
+            minutesInput.setText(m.toString())
+        }
+
         AlertDialog.Builder(this)
-            .setTitle("Add Reminder")
+            .setTitle(if (reminder == null) "Add Reminder" else "Edit Reminder")
             .setView(view)
-            .setPositiveButton("Add") { _, _ ->
+            .setPositiveButton(if (reminder == null) "Add" else "Save") { _, _ ->
                 val name = nameInput.text.toString()
                 val text = textInput.text.toString()
                 
@@ -281,7 +304,11 @@ class MainActivity : AppCompatActivity() {
                                  (minutes * 60 * 1000L)
 
                 if (name.isNotEmpty() && text.isNotEmpty() && intervalMs > 0) {
-                    addReminder(name, text, intervalMs)
+                    if (reminder == null) {
+                        addReminder(name, text, intervalMs)
+                    } else {
+                        updateReminder(reminder, name, text, intervalMs)
+                    }
                 } else if (intervalMs <= 0) {
                     Toast.makeText(this, "Interval must be greater than 0", Toast.LENGTH_SHORT).show()
                 }
@@ -298,6 +325,20 @@ class MainActivity : AppCompatActivity() {
         ReminderReceiver.saveReminders(this, currentReminders)
         
         startReminder(newReminder)
+    }
+
+    private fun updateReminder(oldReminder: Reminder, name: String, text: String, intervalMs: Long) {
+        val currentReminders = ReminderReceiver.getReminders(this)
+        val index = currentReminders.indexOfFirst { it.id == oldReminder.id }
+        if (index != -1) {
+            val updatedReminder = oldReminder.copy(name = name, text = text, intervalMs = intervalMs)
+            currentReminders[index] = updatedReminder
+            ReminderReceiver.saveReminders(this, currentReminders)
+            
+            // Restart alarm with new values
+            cancelReminder(oldReminder)
+            startReminder(updatedReminder)
+        }
     }
 
     private fun startReminder(reminder: Reminder) {
@@ -329,7 +370,10 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    class ReminderAdapter(private val reminders: List<Reminder>) : RecyclerView.Adapter<ReminderAdapter.ViewHolder>() {
+    class ReminderAdapter(
+        private val reminders: List<Reminder>,
+        private val onLongClick: (Reminder) -> Unit
+    ) : RecyclerView.Adapter<ReminderAdapter.ViewHolder>() {
 
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val nameText: TextView = view.findViewById(R.id.textViewName)
@@ -348,13 +392,8 @@ class MainActivity : AppCompatActivity() {
             holder.nameText.text = reminder.name
             holder.contentText.text = reminder.text
             
-            holder.contentText.setOnLongClickListener {
-                val context = holder.itemView.context
-                val intent = Intent(context, ReminderReceiver::class.java).apply {
-                    action = ReminderReceiver.ACTION_REMIND
-                    putExtra(ReminderReceiver.EXTRA_REMINDER_ID, reminder.id)
-                }
-                context.sendBroadcast(intent)
+            holder.itemView.setOnLongClickListener {
+                onLongClick(reminder)
                 true
             }
 
@@ -391,7 +430,7 @@ class MainActivity : AppCompatActivity() {
 
             val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
             val isYesterday = yesterday.get(Calendar.YEAR) == last.get(Calendar.YEAR) &&
-                              yesterday.get(Calendar.DAY_OF_YEAR) == last.get(Calendar.DAY_OF_YEAR)
+                              yesterday.get(Calendar.DAY_OF_YEAR) == last.get(Calendar.YEAR)
 
             val diffMs = now.timeInMillis - timeMs
             val diffDays = diffMs / (1000 * 60 * 60 * 24)
