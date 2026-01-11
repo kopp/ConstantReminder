@@ -80,6 +80,32 @@ class ReminderReceiver : BroadcastReceiver() {
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putString(KEY_REMINDERS, jsonArray.toString()).apply()
         }
+
+        fun scheduleExactAlarm(context: Context, reminder: Reminder) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, ReminderReceiver::class.java).apply {
+                action = ACTION_REMIND
+                putExtra(EXTRA_REMINDER_ID, reminder.id)
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                reminder.id,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val triggerTime = System.currentTimeMillis() + reminder.intervalMs
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (alarmManager.canScheduleExactAlarms()) {
+                    alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                } else {
+                    alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                }
+            } else {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+            }
+        }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -105,6 +131,8 @@ class ReminderReceiver : BroadcastReceiver() {
                 updateShownStats(context, reminderId)
                 createNotificationChannel(context)
                 showNotification(context, reminder)
+                // Schedule the NEXT alarm
+                scheduleExactAlarm(context, reminder)
             }
         }
     }
@@ -127,32 +155,12 @@ class ReminderReceiver : BroadcastReceiver() {
             reminders[index].intervalMs = newInterval
             saveReminders(context, reminders)
             
-            rescheduleAlarm(context, reminders[index])
+            // Reschedule with the new interval
+            scheduleExactAlarm(context, reminders[index])
             
             val minutes = newInterval / 60000.0
             Toast.makeText(context, context.getString(R.string.toast_new_interval, reminder.name, minutes), Toast.LENGTH_SHORT).show()
         }
-    }
-
-    private fun rescheduleAlarm(context: Context, reminder: Reminder) {
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val intent = Intent(context, ReminderReceiver::class.java).apply {
-            action = ACTION_REMIND
-            putExtra(EXTRA_REMINDER_ID, reminder.id)
-        }
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            reminder.id,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        alarmManager.setRepeating(
-            AlarmManager.RTC_WAKEUP,
-            System.currentTimeMillis() + reminder.intervalMs,
-            reminder.intervalMs,
-            pendingIntent
-        )
     }
 
     private fun dismissNotification(context: Context, id: Int) {
