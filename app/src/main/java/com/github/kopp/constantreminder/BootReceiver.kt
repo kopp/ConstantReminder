@@ -6,7 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.provider.Settings
+import kotlin.random.Random
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -31,7 +31,16 @@ class BootReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val triggerTime = System.currentTimeMillis() + reminder.intervalMs
+        // Calculate next scheduled time based on last shown time
+        val nextScheduled = if (reminder.lastShownMs > 0) {
+            reminder.lastShownMs + reminder.intervalMs
+        } else {
+            System.currentTimeMillis() + reminder.intervalMs
+        }
+
+        // Ensure trigger time is at least now, and add a random 1-10 minute delay
+        val randomOffset = Random.nextLong(1, 11) * 60 * 1000L
+        val triggerTime = Math.max(System.currentTimeMillis(), nextScheduled) + randomOffset
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             if (alarmManager.canScheduleExactAlarms()) {
