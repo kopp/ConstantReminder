@@ -31,12 +31,9 @@ class BootReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Calculate next scheduled time based on last shown time
-        val nextScheduled = if (reminder.lastShownMs > 0) {
-            reminder.lastShownMs + reminder.intervalMs
-        } else {
-            System.currentTimeMillis() + reminder.intervalMs
-        }
+        // Calculate next scheduled time based on last shown or creation time
+        val baseTime = if (reminder.lastShownMs > 0) reminder.lastShownMs else reminder.createdAtMs
+        val nextScheduled = baseTime + reminder.intervalMs
 
         // Ensure trigger time is at least now, and add a random 1-10 minute delay
         val randomOffset = Random.nextLong(1, 11) * 60 * 1000L

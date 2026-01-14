@@ -425,7 +425,7 @@ class MainActivity : AppCompatActivity() {
             }
             holder.frequencyText.text = intervalText
             
-            val lastTimeFormatted = if (reminder.lastShownMs > 0) {
+            val lastTimeFormatted = if (reminder.totalShownCount > 0) {
                 formatLastShown(holder.itemView.context, reminder.lastShownMs)
             } else {
                 holder.itemView.context.getString(R.string.stats_never)

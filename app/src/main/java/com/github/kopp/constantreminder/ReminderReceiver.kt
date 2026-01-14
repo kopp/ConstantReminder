@@ -22,6 +22,7 @@ data class Reminder(
     val name: String,
     val text: String,
     var intervalMs: Long,
+    val createdAtMs: Long = System.currentTimeMillis(),
     var lastShownMs: Long = 0,
     var totalShownCount: Int = 0
 ) {
@@ -31,6 +32,7 @@ data class Reminder(
             put("name", name)
             put("text", text)
             put("intervalMs", intervalMs)
+            put("createdAtMs", createdAtMs)
             put("lastShownMs", lastShownMs)
             put("totalShownCount", totalShownCount)
         }
@@ -43,6 +45,7 @@ data class Reminder(
                 json.getString("name"),
                 json.getString("text"),
                 json.getLong("intervalMs"),
+                json.optLong("createdAtMs", System.currentTimeMillis()),
                 json.optLong("lastShownMs", 0),
                 json.optInt("totalShownCount", 0)
             )
@@ -94,7 +97,8 @@ class ReminderReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val triggerTime = System.currentTimeMillis() + reminder.intervalMs
+            val baseTime = if (reminder.lastShownMs > 0) reminder.lastShownMs else reminder.createdAtMs
+            val triggerTime = baseTime + reminder.intervalMs
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (alarmManager.canScheduleExactAlarms()) {
@@ -132,7 +136,10 @@ class ReminderReceiver : BroadcastReceiver() {
                 createNotificationChannel(context)
                 showNotification(context, reminder)
                 // Schedule the NEXT alarm
-                scheduleExactAlarm(context, reminder)
+                val updatedReminder = getReminders(context).find { it.id == reminderId }
+                if (updatedReminder != null) {
+                    scheduleExactAlarm(context, updatedReminder)
+                }
             }
         }
     }
