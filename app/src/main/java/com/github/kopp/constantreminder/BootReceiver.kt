@@ -35,8 +35,8 @@ class BootReceiver : BroadcastReceiver() {
         val baseTime = if (reminder.lastShownMs > 0) reminder.lastShownMs else reminder.createdAtMs
         val nextScheduled = baseTime + reminder.intervalMs
 
-        // Ensure trigger time is at least now, and add a random 1-10 minute delay
-        val randomOffset = Random.nextLong(1, 11) * 60 * 1000L
+        // Ensure trigger time is at least now, and add a random 2-20 minute delay
+        val randomOffset = Random.nextLong(2, 21) * 60 * 1000L
         val triggerTime = Math.max(System.currentTimeMillis(), nextScheduled) + randomOffset
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
