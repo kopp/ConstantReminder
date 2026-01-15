@@ -8,6 +8,7 @@
     <string name="action_increase">More often</string>
     <string name="action_ok">OK</string>
     <string name="action_decrease">Less often</string>
+    <string name="action_snooze">Snooze</string>
     <string name="toast_new_interval">%1$s: %2$.1f Minutes</string>
     <string name="toast_reminder_deleted">%1$s deleted</string>
     <string name="dialog_import_title">Import Reminders</string>

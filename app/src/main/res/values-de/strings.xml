@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Constant Reminder</string>
+    <string name="app_name">Erinnerungs-App</string>
     <string name="add_button">Neues Element hinzufügen</string>
     <string name="app_logo_description">Erinnerungs-App Logo</string>
     <string name="add_reminder_description">Neue Erinnerung hinzufügen</string>
@@ -8,6 +8,7 @@
     <string name="action_increase">Öfter</string>
     <string name="action_ok">OK</string>
     <string name="action_decrease">Seltener</string>
+    <string name="action_snooze">Snooze</string>
     <string name="toast_new_interval">%1$s: %2$.1f Minuten</string>
     <string name="toast_reminder_deleted">%1$s gelöscht</string>
     <string name="dialog_import_title">Erinnerungen importieren</string>

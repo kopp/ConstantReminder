@@ -60,6 +60,7 @@ class ReminderReceiver : BroadcastReceiver() {
         const val ACTION_INCREASE_FREQUENCY = "com.github.kopp.constantreminder.INCREASE_FREQUENCY"
         const val ACTION_DECREASE_FREQUENCY = "com.github.kopp.constantreminder.DECREASE_FREQUENCY"
         const val ACTION_DISMISS = "com.github.kopp.constantreminder.DISMISS"
+        const val ACTION_SNOOZE = "com.github.kopp.constantreminder.SNOOZE"
         
         const val EXTRA_REMINDER_ID = "reminder_id"
         
@@ -84,7 +85,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 .edit().putString(KEY_REMINDERS, jsonArray.toString()).apply()
         }
 
-        fun scheduleExactAlarm(context: Context, reminder: Reminder) {
+        fun scheduleExactAlarm(context: Context, reminder: Reminder, delayMs: Long? = null) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, ReminderReceiver::class.java).apply {
                 action = ACTION_REMIND
@@ -97,8 +98,12 @@ class ReminderReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val baseTime = if (reminder.lastShownMs > 0) reminder.lastShownMs else reminder.createdAtMs
-            val triggerTime = baseTime + reminder.intervalMs
+            val triggerTime = if (delayMs != null) {
+                System.currentTimeMillis() + delayMs
+            } else {
+                val baseTime = if (reminder.lastShownMs > 0) reminder.lastShownMs else reminder.createdAtMs
+                baseTime + reminder.intervalMs
+            }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 if (alarmManager.canScheduleExactAlarms()) {
@@ -129,6 +134,11 @@ class ReminderReceiver : BroadcastReceiver() {
                 dismissNotification(context, reminderId)
             }
             ACTION_DISMISS -> {
+                dismissNotification(context, reminderId)
+            }
+            ACTION_SNOOZE -> {
+                val snoozeMs = Math.min(15 * 60 * 1000L, reminder.intervalMs)
+                scheduleExactAlarm(context, reminder, snoozeMs)
                 dismissNotification(context, reminderId)
             }
             else -> {
@@ -213,6 +223,12 @@ class ReminderReceiver : BroadcastReceiver() {
         }
         val decreasePendingIntent = PendingIntent.getBroadcast(context, reminder.id * 10 + 3, decreaseIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
+        val snoozeIntent = Intent(context, ReminderReceiver::class.java).apply { 
+            action = ACTION_SNOOZE 
+            putExtra(EXTRA_REMINDER_ID, reminder.id)
+        }
+        val snoozePendingIntent = PendingIntent.getBroadcast(context, reminder.id * 10 + 4, snoozeIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
         val builder = NotificationCompat.Builder(context, "gratitude_channel")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(reminder.name)
@@ -220,8 +236,9 @@ class ReminderReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(reminder.text))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
+            .setContentIntent(okPendingIntent) // Clicking the notification body acts as "OK"
             .addAction(0, context.getString(R.string.action_increase), increasePendingIntent)
-            .addAction(0, context.getString(R.string.action_ok), okPendingIntent)
+            .addAction(0, context.getString(R.string.action_snooze), snoozePendingIntent)
             .addAction(0, context.getString(R.string.action_decrease), decreasePendingIntent)
 
         with(NotificationManagerCompat.from(context)) {
