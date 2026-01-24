@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/label_silence_periods"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <CheckBox android:id="@+id/checkMon" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/day_mon" />
+        <CheckBox android:id="@+id/checkTue" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/day_tue" />
+        <CheckBox android:id="@+id/checkWed" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/day_wed" />
+        <CheckBox android:id="@+id/checkThu" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/day_thu" />
+        <CheckBox android:id="@+id/checkFri" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/day_fri" />
+        <CheckBox android:id="@+id/checkSat" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/day_sat" />
+        <CheckBox android:id="@+id/checkSun" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/day_sun" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btnStartTime"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/label_start_time" />
+
+        <View android:layout_width="16dp" android:layout_height="0dp" />
+
+        <Button
+            android:id="@+id/btnEndTime"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/label_end_time" />
+    </LinearLayout>
+</LinearLayout>

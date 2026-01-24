@@ -36,4 +36,18 @@
     <string name="date_yesterday">yesterday %1$s</string>
     <string name="share_title">Share Reminders Configuration</string>
     <string name="toast_permission_denied">Notification permission denied</string>
+    <string name="action_settings">Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="label_silence_periods">Silence Scenarios</string>
+    <string name="btn_add_scenario">Add Scenario</string>
+    <string name="dialog_add_scenario_title">Silence Period</string>
+    <string name="label_start_time">Start Time</string>
+    <string name="label_end_time">End Time</string>
+    <string name="day_mon">M</string>
+    <string name="day_tue">T</string>
+    <string name="day_wed">W</string>
+    <string name="day_thu">T</string>
+    <string name="day_fri">F</string>
+    <string name="day_sat">S</string>
+    <string name="day_sun">S</string>
 </resources>

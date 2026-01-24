@@ -108,6 +108,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_settings -> {
+                startActivity(Intent(this, SettingsActivity::class.java))
+                true
+            }
             R.id.action_share -> {
                 shareConfiguration()
                 true
@@ -317,7 +321,7 @@ class MainActivity : AppCompatActivity() {
                                  (hours * 60 * 60 * 1000L) + 
                                  (minutes * 60 * 1000L)
 
-                if (name.isNotEmpty() && intervalMs > 0) {
+                if (name.isNotEmpty() && text.isNotEmpty() && intervalMs > 0) {
                     if (reminder == null) {
                         addReminder(name, text, intervalMs)
                     } else {
@@ -425,7 +429,7 @@ class MainActivity : AppCompatActivity() {
             }
             holder.frequencyText.text = intervalText
             
-            val lastTimeFormatted = if (reminder.totalShownCount > 0) {
+            val lastTimeFormatted = if (reminder.lastShownMs > 0) {
                 formatLastShown(holder.itemView.context, reminder.lastShownMs)
             } else {
                 holder.itemView.context.getString(R.string.stats_never)

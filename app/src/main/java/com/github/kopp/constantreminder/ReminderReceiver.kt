@@ -16,6 +16,8 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Calendar
+import kotlin.random.Random
 
 data class Reminder(
     val id: Int,
@@ -53,6 +55,44 @@ data class Reminder(
     }
 }
 
+data class SilenceScenario(
+    val id: Int,
+    val days: List<Int>, // Calendar.MONDAY, etc.
+    val startHour: Int,
+    val startMinute: Int,
+    val endHour: Int,
+    val endMinute: Int
+) {
+    fun toJsonObject(): JSONObject {
+        return JSONObject().apply {
+            put("id", id)
+            put("days", JSONArray(days))
+            put("startHour", startHour)
+            put("startMinute", startMinute)
+            put("endHour", endHour)
+            put("endMinute", endMinute)
+        }
+    }
+
+    companion object {
+        fun fromJsonObject(json: JSONObject): SilenceScenario {
+            val daysJson = json.getJSONArray("days")
+            val daysList = mutableListOf<Int>()
+            for (i in 0 until daysJson.length()) {
+                daysList.add(daysJson.getInt(i))
+            }
+            return SilenceScenario(
+                json.getInt("id"),
+                daysList,
+                json.getInt("startHour"),
+                json.getInt("startMinute"),
+                json.getInt("endHour"),
+                json.getInt("endMinute")
+            )
+        }
+    }
+}
+
 class ReminderReceiver : BroadcastReceiver() {
 
     companion object {
@@ -66,6 +106,7 @@ class ReminderReceiver : BroadcastReceiver() {
         
         const val PREFS_NAME = "ReminderPrefs"
         const val KEY_REMINDERS = "reminders_list"
+        const val KEY_SCENARIOS = "scenarios_list"
 
         fun getReminders(context: Context): MutableList<Reminder> {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -85,7 +126,25 @@ class ReminderReceiver : BroadcastReceiver() {
                 .edit().putString(KEY_REMINDERS, jsonArray.toString()).apply()
         }
 
-        fun scheduleExactAlarm(context: Context, reminder: Reminder, delayMs: Long? = null) {
+        fun getSilenceScenarios(context: Context): MutableList<SilenceScenario> {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val jsonString = prefs.getString(KEY_SCENARIOS, null) ?: return mutableListOf()
+            val jsonArray = JSONArray(jsonString)
+            val list = mutableListOf<SilenceScenario>()
+            for (i in 0 until jsonArray.length()) {
+                list.add(SilenceScenario.fromJsonObject(jsonArray.getJSONObject(i)))
+            }
+            return list
+        }
+
+        fun saveSilenceScenarios(context: Context, scenarios: List<SilenceScenario>) {
+            val jsonArray = JSONArray()
+            scenarios.forEach { jsonArray.put(it.toJsonObject()) }
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putString(KEY_SCENARIOS, jsonArray.toString()).apply()
+        }
+
+        fun scheduleExactAlarm(context: Context, reminder: Reminder, delayMs: Long? = null, triggerTimeMs: Long? = null) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, ReminderReceiver::class.java).apply {
                 action = ACTION_REMIND
@@ -98,11 +157,13 @@ class ReminderReceiver : BroadcastReceiver() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val triggerTime = if (delayMs != null) {
-                System.currentTimeMillis() + delayMs
-            } else {
-                val baseTime = if (reminder.lastShownMs > 0) reminder.lastShownMs else reminder.createdAtMs
-                baseTime + reminder.intervalMs
+            val triggerTime = when {
+                triggerTimeMs != null -> triggerTimeMs
+                delayMs != null -> System.currentTimeMillis() + delayMs
+                else -> {
+                    val baseTime = if (reminder.lastShownMs > 0) reminder.lastShownMs else reminder.createdAtMs
+                    baseTime + reminder.intervalMs
+                }
             }
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -113,6 +174,29 @@ class ReminderReceiver : BroadcastReceiver() {
                 }
             } else {
                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+            }
+        }
+
+        fun isWithinScenario(now: Calendar, scenario: SilenceScenario): Boolean {
+            val currentMinutes = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+            val startMinutes = scenario.startHour * 60 + scenario.startMinute
+            val endMinutes = scenario.endHour * 60 + scenario.endMinute
+
+            return if (startMinutes < endMinutes) {
+                // Same day scenario
+                if (now.get(Calendar.DAY_OF_WEEK) !in scenario.days) return false
+                currentMinutes in startMinutes until endMinutes
+            } else {
+                // Overlaps midnight
+                val prevDay = if (now.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY) Calendar.SATURDAY else now.get(Calendar.DAY_OF_WEEK) - 1
+                val yesterdayCorrected = if (now.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY && prevDay == Calendar.SATURDAY) Calendar.SATURDAY 
+                                         else if (now.get(Calendar.DAY_OF_WEEK) == Calendar.MONDAY) Calendar.SUNDAY 
+                                         else now.get(Calendar.DAY_OF_WEEK) - 1
+
+                val isStartedYesterday = yesterdayCorrected in scenario.days && currentMinutes < endMinutes
+                val isStartingToday = now.get(Calendar.DAY_OF_WEEK) in scenario.days && currentMinutes >= startMinutes
+                
+                isStartedYesterday || isStartingToday
             }
         }
     }
@@ -142,16 +226,41 @@ class ReminderReceiver : BroadcastReceiver() {
                 dismissNotification(context, reminderId)
             }
             else -> {
-                updateShownStats(context, reminderId)
-                createNotificationChannel(context)
-                showNotification(context, reminder)
-                // Schedule the NEXT alarm
-                val updatedReminder = getReminders(context).find { it.id == reminderId }
-                if (updatedReminder != null) {
-                    scheduleExactAlarm(context, updatedReminder)
+                val now = Calendar.getInstance()
+                val scenarios = getSilenceScenarios(context)
+                val activeScenario = scenarios.find { isWithinScenario(now, it) }
+
+                if (activeScenario != null) {
+                    // Silenced! Reschedule after silence period ends + random delay
+                    val nextAllowedTime = getEndOfSilenceMs(now, activeScenario)
+                    val randomOffset = Random.nextLong(1, 11) * 60 * 1000L
+                    scheduleExactAlarm(context, reminder, triggerTimeMs = nextAllowedTime + randomOffset)
+                } else {
+                    updateShownStats(context, reminderId)
+                    createNotificationChannel(context)
+                    showNotification(context, reminder)
+                    
+                    // Re-fetch to get updated lastShownMs for next schedule
+                    val updatedReminder = getReminders(context).find { it.id == reminderId }
+                    if (updatedReminder != null) {
+                        scheduleExactAlarm(context, updatedReminder)
+                    }
                 }
             }
         }
+    }
+
+    private fun getEndOfSilenceMs(now: Calendar, scenario: SilenceScenario): Long {
+        val end = now.clone() as Calendar
+        end.set(Calendar.HOUR_OF_DAY, scenario.endHour)
+        end.set(Calendar.MINUTE, scenario.endMinute)
+        end.set(Calendar.SECOND, 0)
+        end.set(Calendar.MILLISECOND, 0)
+        
+        if (end.before(now)) {
+            end.add(Calendar.DAY_OF_MONTH, 1)
+        }
+        return end.timeInMillis
     }
 
     private fun updateShownStats(context: Context, id: Int) {
