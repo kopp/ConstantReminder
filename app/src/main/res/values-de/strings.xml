@@ -36,4 +36,22 @@
     <string name="date_yesterday">gestern %1$s</string>
     <string name="share_title">Konfiguration teilen</string>
     <string name="toast_permission_denied">Benachrichtigungsberechtigung abgelehnt</string>
+    <string name="action_settings">Einstellungen</string>
+    <string name="settings_title">Einstellungen</string>
+    <string name="label_silence_periods">Ruhezeiten</string>
+    <string name="btn_add_scenario">Szenario hinzufügen</string>
+    <string name="dialog_add_scenario_title">Ruhezeitraum</string>
+    <string name="label_start_time">Startzeit</string>
+    <string name="label_end_time">Endzeit</string>
+    <string name="day_mon">Mo</string>
+    <string name="day_tue">Di</string>
+    <string name="day_wed">Mi</string>
+    <string name="day_thu">Do</string>
+    <string name="day_fri">Fr</string>
+    <string name="day_sat">Sa</string>
+    <string name="day_sun">So</string>
+    <string name="label_periodic_backup">Periodisches Backup</string>
+    <string name="btn_select_folder">Ordner wählen</string>
+    <string name="label_random_delay">Zufällige Verzögerung (Min)</string>
+    <string name="toast_folder_selected">Ordner ausgewählt: %1$s</string>
 </resources>

@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
@@ -14,9 +15,13 @@ import androidx.core.app.NotificationManagerCompat
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import androidx.documentfile.provider.DocumentFile
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 import kotlin.random.Random
 
 data class Reminder(
@@ -107,6 +112,10 @@ class ReminderReceiver : BroadcastReceiver() {
         const val PREFS_NAME = "ReminderPrefs"
         const val KEY_REMINDERS = "reminders_list"
         const val KEY_SCENARIOS = "scenarios_list"
+        const val KEY_BACKUP_URI = "backup_folder_uri"
+        const val KEY_RANDOM_DELAY = "random_delay_min"
+        const val KEY_BACKUP_ENABLED = "backup_enabled"
+        const val KEY_LAST_BACKUP_DATE = "last_backup_date"
 
         fun getReminders(context: Context): MutableList<Reminder> {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -122,8 +131,9 @@ class ReminderReceiver : BroadcastReceiver() {
         fun saveReminders(context: Context, reminders: List<Reminder>) {
             val jsonArray = JSONArray()
             reminders.forEach { jsonArray.put(it.toJsonObject()) }
+            val jsonString = jsonArray.toString()
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putString(KEY_REMINDERS, jsonArray.toString()).apply()
+                .edit().putString(KEY_REMINDERS, jsonString).apply()
         }
 
         fun getSilenceScenarios(context: Context): MutableList<SilenceScenario> {
@@ -140,8 +150,49 @@ class ReminderReceiver : BroadcastReceiver() {
         fun saveSilenceScenarios(context: Context, scenarios: List<SilenceScenario>) {
             val jsonArray = JSONArray()
             scenarios.forEach { jsonArray.put(it.toJsonObject()) }
+            val jsonString = jsonArray.toString()
             context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit().putString(KEY_SCENARIOS, jsonArray.toString()).apply()
+                .edit().putString(KEY_SCENARIOS, jsonString).apply()
+        }
+
+        private fun performPeriodicBackup(context: Context) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            if (!prefs.getBoolean(KEY_BACKUP_ENABLED, false)) return
+
+            val today = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
+            val lastBackup = prefs.getString(KEY_LAST_BACKUP_DATE, "")
+            if (today == lastBackup) return
+
+            val remindersJson = prefs.getString(KEY_REMINDERS, "[]") ?: "[]"
+            val scenariosJson = prefs.getString(KEY_SCENARIOS, "[]") ?: "[]"
+            
+            saveToExternalFolder(context, "ConstantReminders_reminders_backup.json", remindersJson)
+            saveToExternalFolder(context, "ConstantReminders_scenarios_backup.json", scenariosJson)
+            
+            prefs.edit().putString(KEY_LAST_BACKUP_DATE, today).apply()
+        }
+
+        private fun saveToExternalFolder(context: Context, filename: String, content: String) {
+            val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val uriStr = prefs.getString(KEY_BACKUP_URI, null) ?: return
+            
+            try {
+                val folderUri = Uri.parse(uriStr)
+                val pickedDir = DocumentFile.fromTreeUri(context, folderUri)
+                
+                var file = pickedDir?.findFile(filename)
+                if (file == null) {
+                    file = pickedDir?.createFile("application/json", filename)
+                }
+                
+                file?.uri?.let {
+                    context.contentResolver.openOutputStream(it)?.use { outputStream ->
+                        outputStream.write(content.toByteArray())
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         fun scheduleExactAlarm(context: Context, reminder: Reminder, delayMs: Long? = null, triggerTimeMs: Long? = null) {
@@ -233,9 +284,12 @@ class ReminderReceiver : BroadcastReceiver() {
                 if (activeScenario != null) {
                     // Silenced! Reschedule after silence period ends + random delay
                     val nextAllowedTime = getEndOfSilenceMs(now, activeScenario)
-                    val randomOffset = Random.nextLong(1, 11) * 60 * 1000L
+                    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    val maxRandomDelay = prefs.getInt(KEY_RANDOM_DELAY, 10)
+                    val randomOffset = Random.nextLong(1, maxRandomDelay + 1L) * 60 * 1000L
                     scheduleExactAlarm(context, reminder, triggerTimeMs = nextAllowedTime + randomOffset)
                 } else {
+                    performPeriodicBackup(context) // Run daily backup when notification fires
                     updateShownStats(context, reminderId)
                     createNotificationChannel(context)
                     showNotification(context, reminder)

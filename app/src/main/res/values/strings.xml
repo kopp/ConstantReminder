@@ -50,4 +50,8 @@
     <string name="day_fri">F</string>
     <string name="day_sat">S</string>
     <string name="day_sun">S</string>
+    <string name="label_periodic_backup">Periodic Backup</string>
+    <string name="btn_select_folder">Select Folder</string>
+    <string name="label_random_delay">Random Delay (min)</string>
+    <string name="toast_folder_selected">Folder selected: %1$s</string>
 </resources>
