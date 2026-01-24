@@ -317,7 +317,7 @@ class MainActivity : AppCompatActivity() {
                                  (hours * 60 * 60 * 1000L) + 
                                  (minutes * 60 * 1000L)
 
-                if (name.isNotEmpty() && text.isNotEmpty() && intervalMs > 0) {
+                if (name.isNotEmpty() && intervalMs > 0) {
                     if (reminder == null) {
                         addReminder(name, text, intervalMs)
                     } else {
