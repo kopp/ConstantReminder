@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Erinnerungs-App</string>
+    <string name="app_name">Constant Reminder</string>
     <string name="add_button">Neues Element hinzufügen</string>
     <string name="app_logo_description">Erinnerungs-App Logo</string>
     <string name="add_reminder_description">Neue Erinnerung hinzufügen</string>
